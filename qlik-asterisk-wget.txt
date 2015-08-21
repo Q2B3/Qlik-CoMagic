@@ -1,0 +1,37 @@
+rem Подключаемся к целебному источнику данных;
+Execute wget.exe "http://api.comagic.ru/api/login/?login=LOGIN&password=PaSsWoRd" -O wget.json;
+
+rem Вытаскиваем ключ сессии;
+session_tab: LOAD  
+TextBetween([@1:n],'"session_key": "','"',1) as session_key 
+FROM [wget.json] (fix, codepage is 1251)
+;
+let sk=Peek('session_key');
+DROP Table session_tab;
+
+rem Список рекламных кампаний;
+let req='http://api.comagic.ru/api/v1/ac/?session_key=' & sk;
+Execute wget.exe "$(req)" --header="Accept: application/xml" -O СписокРекламныхКомпаний.XML;
+
+rem Список сайтов;
+let req='http://api.comagic.ru/api/v1/site/?session_key=' & sk;
+Execute wget.exe "$(req)" --header="Accept: application/xml" -O СписокСайтов.XML;
+
+rem Список тегов;
+let req='http://api.comagic.ru/api/v1/tag/?session_key=' & sk;
+Execute wget.exe "$(req)" --header="Accept: application/xml" -O СписокТегов.XML;
+
+for d=today(2)-1 to today(2)-7 step -1;// Перегружаем данные за последнии несколько дней
+
+let ds=date(d,'YYYY-MM-DD'); //Дата начала периода 
+let de=date(d+1,'YYYY-MM-DD'); //Дата окончания периода (исключительно)
+
+rem Информация о звонках;
+let req='http://api.comagic.ru/api/v1/call/?session_key=' & sk & '&date_from=' & ds & '%2000:00:00&date_till=' & de & '%2000:00:00'; //limit=100 
+Execute wget.exe "$(req)" --header="Accept: application/xml" -O $(ds).XML;
+
+NEXT d; 
+
+rem Завершение сессии;
+let req='http://api.comagic.ru/api/logout/?session_key=' & sk;
+Execute wget.exe "$(req)" --header="Accept: application/xml" -O wget.json;
