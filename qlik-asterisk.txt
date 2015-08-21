@@ -1,0 +1,97 @@
+rem Получение ключа сессии;
+tmpSID: LOAD 
+success, // надо бы поверять на 'true'
+[data/session_key] as session_key
+FROM [http://api.comagic.ru/api/login/?accept=application/xml&login=LOGIN&password=PASSWORD] (XmlSimple, Table is [root]);
+
+let sk=Peek('session_key');
+DROP Table tmpSID;
+
+rem Список рекламных кампаний;
+let req='http://api.comagic.ru/api/v1/ac/?accept=application/xml&session_key=' & sk;
+ac: LOAD 
+id,
+name
+FROM [$(req)] (XmlSimple, Table is [root/data/item]);
+	STORE ac into [..\ComagicData\СписокРекламныхКомпаний.qvd] (qvd); 
+DROP Table ac;
+
+rem Список сайтов;
+let req='http://api.comagic.ru/api/v1/site/?accept=application/xml&session_key=' & sk;
+site: LOAD 
+id,
+domain
+FROM [$(req)] (XmlSimple, Table is [root/data/item]);
+	STORE site into [..\ComagicData\СписокСайтов.qvd] (qvd);
+DROP Table site;
+
+rem Список тегов;
+let req='http://api.comagic.ru/api/v1/tag/?accept=application/xml&session_key=' & sk;
+tag: LOAD 
+id,
+name
+FROM [$(req)] (XmlSimple, Table is [root/data/item]);
+	STORE tag into [..\ComagicData\СписокТегов.qvd] (qvd);
+DROP Table tag;
+
+for d=today(2)-1 to today(2)-7 step -1;// За последние несколько дней
+set ErrorMode=0;	
+let ds=date(d,'YYYY-MM-DD'); //Дата начала периода 
+let de=date(d+1,'YYYY-MM-DD'); //Дата окончания периода (исключительно)
+
+rem Информация о звонках;
+let req='http://api.comagic.ru/api/v1/call/?accept=application/xml&session_key=' & sk & '&date_from=' & ds & '%2000:00:00&date_till=' & de & '%2000:00:00'; //limit=100 
+call: LOAD 
+ua_client_id,
+gclid,
+utm_content,
+numa,
+visitor_id,
+wait_time,
+duration,
+is_transfer,
+id,
+search_engine,
+utm_term,
+call_date,
+session_start,
+visits_count,
+utm_medium,
+scenario_name,
+city,
+status,
+os_ad_id,
+utm_campaign,
+communication_type,
+operator_name,
+utm_source,
+referrer_domain,
+os_service_name,
+visitor_type,
+numb,
+region,
+os_campaign_id,
+visitor_first_ac,
+communication_number,
+referrer,
+site_id,
+session_id,
+ac_id,
+other_adv_contacts,
+search_query,
+country,
+os_source_id,
+yclid,
+page_url,
+[tags/item],
+[file_link/item]
+FROM [$(req)] (XmlSimple, Table is [root/data/item]);
+STORE call into [..\ComagicData\ИнформацияОЗвонкахQVD\$(ds).qvd] (qvd);
+DROP Table call;
+NEXT d; 
+
+rem Завершение сессии;
+let req='http://api.comagic.ru/api/logout/?accept=application/xml&session_key=' & sk;
+tmpSID: LOAD success FROM [$(req)] (XmlSimple, Table is [root]);
+
+set ErrorMode=1;
